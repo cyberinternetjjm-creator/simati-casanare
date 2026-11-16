@@ -1,0 +1,203 @@
+ <!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SIMATI - Monitoreo en la Nube Casanare</title>
+<style>
+:root{font-family:Arial,sans-serif;color:#172033;background:#f3f6fb}*{box-sizing:border-box}body{margin:0;padding:24px}.wrap{max-width:1050px;margin:auto}.top{background:#12345a;color:white;padding:24px;border-radius:16px}.top h1{margin:0 0 8px}.top p{margin:0;color:#dce9f8}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:16px;margin:18px 0}.card{background:white;padding:18px;border-radius:14px;box-shadow:0 2px 10px #13294b12}.muted{color:#667085;font-size:14px}.value{font-size:36px;font-weight:bold;margin:8px 0}.status{padding:12px;border-radius:10px;font-weight:bold;margin-top:10px}.green{background:#dcfce7;color:#166534}.yellow{background:#fef9c3;color:#854d0e}.orange{background:#ffedd5;color:#9a3412}.red{background:#fee2e2;color:#991b1b}input,select{width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;margin-top:4px;margin-bottom:10px;background:white}button{border:0;border-radius:9px;background:#145da0;color:white;padding:12px 16px;font-weight:bold;cursor:pointer;margin:8px 6px 0 0}button:disabled{opacity:0.6;cursor:not-allowed}button.secondary{background:#e5edf6;color:#17324d}.meter{height:18px;background:#e5e7eb;border-radius:20px;overflow:hidden;margin:12px 0}.bar{height:100%;width:20%;background:#16a34a;transition:.25s}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:9px;border-bottom:1px solid #e5e7eb}th{background:#f8fafc}canvas{width:100%;height:260px;border:1px solid #e5e7eb;border-radius:10px}.notice{border-left:4px solid #d97706;padding:10px 12px;background:#fff7ed;color:#7c2d12;border-radius:6px;font-size:13px}.sms{background:#f1f5f9;border-radius:10px;padding:12px;min-height:54px}.cloud-badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:bold;background:#e0f2fe;color:#0369a1;margin-top:8px}footer{margin:20px 0;color:#64748b;font-size:12px}
+</style></head>
+<body><div class="wrap">
+<header class="top">
+  <h1>SIMATI · Casanare</h1>
+  <p>Sistema de Monitoreo y Alerta Temprana de Inundaciones · Conectado a Base de Datos en la Nube</p>
+  <div id="cloudStatus" class="cloud-badge">Conectando con Google Sheets...</div>
+</header>
+
+<div class="notice" style="margin-top:16px"><b>IMPORTANTE:</b> esta es una demostración académica con valores simulados. No está conectada a sensores físicos ni a autoridades oficiales.</div>
+
+<section class="grid">
+  <div class="card">
+    <h3>Estación y medición</h3>
+    <label for="station"><b>Estación hidrológica en Casanare:</b></label>
+    <select id="station">
+      <option value="Río Casanare - Hato Corozal">Río Casanare - Hato Corozal</option>
+      <option value="Río Cravo Sur - Yopal">Río Cravo Sur - Yopal</option>
+      <option value="Río Cusiana - Aguazul">Río Cusiana - Aguazul</option>
+      <option value="Río Ariporo - Paz de Ariporo">Río Ariporo - Paz de Ariporo</option>
+      <option value="Río Upía - Villanueva">Río Upía - Villanueva</option>
+    </select>
+
+    <label for="level">Nivel de agua registrado (cm)</label>
+    <div class="value"><span id="num">20</span> <small style="font-size:16px">cm</small></div>
+    <input id="level" type="range" min="0" max="100" value="20">
+    <button id="record">Guardar en la nube</button>
+    <button class="secondary" id="random">Simular lectura</button>
+  </div>
+
+  <div class="card">
+    <h3>Estado del sistema</h3>
+    <div class="value" id="state">Normal</div>
+    <div class="meter"><div class="bar" id="bar"></div></div>
+    <div id="badge" class="status green">VERDE · Nivel bajo</div>
+    <p class="muted" id="detail">Sin condición de alerta en esta estación.</p>
+  </div>
+
+  <div class="card">
+    <h3>Alerta preventiva</h3>
+    <div class="sms" id="sms">SIMULACIÓN: lectura registrada. Manténgase informado por canales oficiales.</div>
+    <p class="muted" id="stationInfo">Estación seleccionada: Río Casanare - Hato Corozal.</p>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Historial en la nube (Google Sheets)</h3>
+  <p class="muted">Estos registros se cargan directamente desde tu hoja de cálculo y permanecen guardados aunque cierres el navegador.</p>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Fecha y Hora</th><th>Estación</th><th>Nivel (cm)</th><th>Estado</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="4">Cargando datos de la nube...</td></tr></tbody>
+    </table>
+  </div>
+  <button class="secondary" id="refresh">Actualizar tabla</button>
+  <button class="secondary" id="clear">Vaciar base de datos</button>
+</section>
+
+<section class="card" style="margin-top:16px">
+  <h3>Gráfico de dispersión histórico</h3>
+  <p class="muted">Evolución de los niveles registrados en la nube (azul = normal/atención, rojo = alto/crítico).</p>
+  <canvas id="plot" width="900" height="260"></canvas>
+</section>
+
+<footer>Prototipo académico SIMATI · Almacenamiento persistente mediante Google Apps Script.</footer>
+</div>
+
+<script>
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-VONmtwzs7ch5lq7CdCy88caeVcweLrYH6UwAI2SjYDs2KFvF33gVkdmwI9BIdsWo/exec';
+
+const slider=document.getElementById('level'),station=document.getElementById('station'),num=document.getElementById('num'),state=document.getElementById('state'),badge=document.getElementById('badge'),detail=document.getElementById('detail'),bar=document.getElementById('bar'),sms=document.getElementById('sms'),rows=document.getElementById('rows'),plot=document.getElementById('plot'),cloudStatus=document.getElementById('cloudStatus'),recordBtn=document.getElementById('record'),stationInfo=document.getElementById('stationInfo');
+let data=[];
+
+function classify(v){
+  if(v<30)return ['Normal','green','VERDE · Nivel bajo','Sin condición de alerta en esta estación.','SIMULACIÓN ('+station.value+'): nivel bajo. Continúe consultando información oficial.'];
+  if(v<50)return ['Atención','yellow','AMARILLO · Atención preventiva','Aumento moderado del caudal en la estación.','SIMULACIÓN ('+station.value+'): aumento del nivel. Manténgase atento a comunicados.'];
+  if(v<70)return ['Alto','orange','NARANJA · Alerta alta','Nivel elevado con riesgo de desbordamiento leve.','SIMULACIÓN ('+station.value+'): nivel alto. Consulte a gestión del riesgo local.'];
+  return ['Crítico','red','ROJO · Alerta máxima','Nivel crítico en la estación monitoreada.','SIMULACIÓN ('+station.value+'): nivel máximo. Siga instrucciones de autoridades.'];
+}
+
+function update(){
+  let v=+slider.value;
+  num.textContent=v;
+  stationInfo.textContent='Estación seleccionada: '+station.value;
+  let c=classify(v);
+  state.textContent=c[0];
+  badge.className='status '+c[1];
+  badge.textContent=c[2];
+  detail.textContent=c[3];
+  sms.textContent=c[4];
+  bar.style.width=v+'%';
+  bar.style.background=({green:'#16a34a',yellow:'#eab308',orange:'#f97316',red:'#dc2626'})[c[1]];
+}
+
+function draw(){
+  let ctx=plot.getContext('2d'),w=plot.width,h=plot.height;
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle='#dbe3ed';ctx.fillStyle='#475569';ctx.font='13px Arial';
+  for(let i=0;i<=5;i++){
+    let y=20+i*(h-45)/5;
+    ctx.beginPath();ctx.moveTo(45,y);ctx.lineTo(w-15,y);ctx.stroke();
+    ctx.fillText(String(100-i*20),8,y+4);
+  }
+  ctx.fillText('Nivel (cm)',8,14);
+  ctx.fillText('Registros históricos en la nube',w/2-85,h-5);
+  if(!data.length){
+    ctx.fillText('Sin datos en la nube aún. Guarda una medición para graficar.',w/2-175,h/2);
+    return;
+  }
+  let maxX=Math.max(5,data.length);
+  data.forEach((d,i)=>{
+    let x=50+(i+1)*(w-80)/(maxX+1),y=20+(100-d.v)*(h-45)/100;
+    ctx.beginPath();
+    ctx.arc(x,y,6,0,Math.PI*2);
+    ctx.fillStyle=d.v>=50?'#dc2626':'#2563eb';
+    ctx.fill();
+    ctx.fillStyle='#475569';
+    ctx.fillText(String(i+1),x-3,h-18);
+  });
+}
+
+function render(){
+  rows.innerHTML='';
+  if(!data.length){
+    rows.innerHTML='<tr><td colspan="4">La base de datos está vacía. Registra una medición.</td></tr>';
+    draw();return;
+  }
+  [...data].reverse().forEach(d=>{
+    let tr=document.createElement('tr');
+    tr.innerHTML=`<td>${d.fecha||'Sin fecha'}</td><td>${d.estacion||'-'}</td><td><b>${d.v} cm</b></td><td>${d.estado||'-'}</td>`;
+    rows.appendChild(tr);
+  });
+  draw();
+}
+
+async function loadData(){
+  cloudStatus.textContent='Sincronizando con Google Sheets...';
+  try{
+    let res=await fetch(SCRIPT_URL);
+    let json=await res.json();
+    data=json.filter(r=>r.estacion && r.estacion!=='ESTACION' && r.v!==null && r.v!=='');
+    cloudStatus.textContent='Conectado a Google Sheets · '+data.length+' registros';
+    cloudStatus.style.background='#dcfce7';
+    cloudStatus.style.color='#166534';
+    render();
+  }catch(e){
+    cloudStatus.textContent='Error de conexión con Google Sheets';
+    cloudStatus.style.background='#fee2e2';
+    cloudStatus.style.color='#991b1b';
+    rows.innerHTML='<tr><td colspan="4">No se pudo conectar. Verifica los permisos del script o abre con Live Server.</td></tr>';
+    draw();
+  }
+}
+
+async function saveData(){
+  recordBtn.disabled=true;
+  recordBtn.textContent='Guardando...';
+  let v=+slider.value;
+  let payload={
+    fecha:new Date().toLocaleString('es-CO'),
+    estacion:station.value,
+    v:v,
+    estado:classify(v)[0]
+  };
+  try{
+    await fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',body:JSON.stringify(payload)});
+    data.push(payload);
+    render();
+    cloudStatus.textContent='Registro guardado en la nube';
+    setTimeout(loadData,1500);
+  }catch(e){
+    alert('Error al guardar en la nube');
+  }finally{
+    recordBtn.disabled=false;
+    recordBtn.textContent='Guardar en la nube';
+  }
+}
+
+slider.oninput=update;
+station.onchange=update;
+document.getElementById('random').onclick=()=>{slider.value=Math.floor(Math.random()*101);update();};
+recordBtn.onclick=saveData;
+document.getElementById('refresh').onclick = loadData;
+
+document.getElementById('clear').onclick = async () => {
+  if (!confirm('¿Estás seguro de vaciar todos los registros?')) return;
+  data = [];
+  render();
+  cloudStatus.textContent = 'Base de datos vaciada localmente';
+};
+
+// Inicializar la interfaz y cargar datos al abrir la página
+update();
+loadData();
+</script>
+</body>
+</html>
